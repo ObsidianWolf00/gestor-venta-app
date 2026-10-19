@@ -1,0 +1,4 @@
+body { font-family: sans-serif; margin: 16px; }
+.producto { border: 1px solid #ccc; border-radius: 8px; padding: 12px; max-width: 360px; }
+.producto h2 { margin: 0 0 8px; }
+.miniatura {width: 80px; height: 80px; object-fit: cover; margin: 4px; border-radius: 4px; }

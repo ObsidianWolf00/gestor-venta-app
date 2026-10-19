@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Gestor de venta</title>
+        <link rel="stylesheet" href="estilos.css">
+    </head>
+    <body>
+        <h1>Mi catálogo</h1>
+        <h2>Añadir producto</h2>
+        <form id="formulario">
+            <label>Nombre <input id="nombre" required></label>
+            <label>Marca (opcional) <input id="marca"></label>
+            <label>Características (Una por línea)
+                <textarea id="caracteristicas" rows="3"></textarea>
+            </label>
+            <label>Precio <input id="precio" type="number" min="0" step="any" required></label>
+            <label>Moneda del precio
+                <select id="monedaPrecio"><option>USD</option><option>CUP</option></select>
+            </label>
+            <label>Disponibilidad <input id="disponibilidad"></label>
+            <label>Comisión <input id="comision" type="number" min="0" step="any" required></label>
+            <label>Moneda de la comisión
+                <select id="monedaComision"><option>CUP</option><option>USD</option></select>
+            </label>
+            <label>Fotos <input type="file" id="fotos" accept="image/*" multiple></label>
+            <div id="vistaPrevia"></div>
+            <button type="submit" id="botonGuardar">Guardar productos</button>
+            <button type="button" id="botonCancelar" hidden>Cancelar</button>
+        </form>
+        <section id="panelAnuncio" hidden>
+            <h2>Anuncio</h2>
+            <label>Estilo
+                <select id="estiloAnuncio">
+                    <option value="simple">Simple</option>
+                    <option value="llamativo">Llamativo</option>
+                </select>
+            </label>
+            <button type="button" id="regenerarAnuncio">Regenerar</button>
+            <textarea id="textoAnuncio" rows="10"></textarea>
+            <button type="button" id="cerrarAnuncio">Cerrar</button>
+            <button type="button" id="copiarAnuncio">Copiar texto</button>
+        </section>
+        <div id="catalogo"></div>
+        <script src="app.js"></script>
+    </body>
+</html>
