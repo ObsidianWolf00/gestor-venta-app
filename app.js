@@ -436,3 +436,16 @@ document.getElementById("regenerarAnuncio").addEventListener("click", actualizar
 document.getElementById("copiarAnuncio").addEventListener("click", copiarAnuncio);
 
 mostrarCatalogo();
+
+async function registrarServiceWorker() {
+    // TU PARTE: si "serviceWorker" existe en navigator, registra "sw.js" con await,
+    // dentro de un try/catch que muestre el error en la consola si falla
+    if ("serviceWorker" in navigator) {
+        try {
+            await navigator.serviceWorker.register("sw.js");
+        } catch (error) {
+            console.error("Error al registrar el service worker:", error);
+        }
+    }
+}
+registrarServiceWorker();
