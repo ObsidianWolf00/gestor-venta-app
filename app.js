@@ -431,11 +431,203 @@ async function copiarAnuncio() {
     }
 }
 
+async function exportarCopia() {
+    // 1) Reunir los números de foto que usan los productos, sin repetir
+    const ids = [];
+    productos.forEach(function (p) {
+        // TU PARTE 1: si p tiene fotos, añade a ids cada número que todavía no esté
+        // (pista: ids.includes(n) dice si ya está)
+        if (p.fotos) {
+            p.fotos.forEach(function (id) {
+                if (!ids.includes(id)) {
+                    ids.push(id);
+                }
+            });
+        }
+    });
+
+    // 2) Leer cada foto desde IndexedDB
+    const fotos = [];       // datos de cada foto
+    const bloques = [];     // las fotos en sí
+    for (const id of ids) {
+        const blob = await obtenerFoto(id);
+        if (!blob) {
+            continue;
+        }
+        fotos.push({ id: id, tipo: blob.type, tamano: blob.size });
+        bloques.push(blob);
+    }
+
+    // 3) Armar el JSON en bytes y una cabecera de 4 bytes con su longitud
+    const datos = { version: 2, fecha: new Date().toISOString(), productos: productos, fotos: fotos };
+    const json = new TextEncoder().encode(JSON.stringify(datos));
+    const longitud = new ArrayBuffer(4);
+    new DataView(longitud).setUint32(0, json.length);
+
+    // 4) Unirlo todo en un solo archivo
+    const archivo = new Blob([longitud, json].concat(bloques), { type: "application/octet-stream" });
+    console.log(fotos.length + " fotos, " + archivo.size + " bytes");
+
+    // 5) TU PARTE 2: descárgalo con el mismo método de antes, con el nombre
+    const enlace = document.createElement("a");
+    enlace.href = URL.createObjectURL(archivo);
+    enlace.download = "gestor-copia-" + datos.fecha.slice(0, 10) + ".copia";
+    enlace.click();
+
+    setTimeout(function () {
+        URL.revokeObjectURL(enlace.href);
+    }, 1000);
+}
+
+function copiaValida(datos, longitud, tamanoArchivo) {
+    if (
+        !datos ||
+        datos.version !== 2 ||
+        !Array.isArray(datos.productos) ||
+        !Array.isArray(datos.fotos)
+    ) {
+        return false;
+    }
+
+    const productosValidos = datos.productos.every(function (p) {
+        return (
+            p &&
+            p.id !== undefined &&
+            typeof p.nombre === "string" &&
+            p.precio &&
+            typeof p.precio.monto === "number" &&
+            p.comision &&
+            typeof p.comision.monto === "number"
+        );
+    });
+
+    if (!productosValidos) {
+        return false;
+    }
+
+    const fotosValidas = datos.fotos.every(function (foto) {
+        return (
+            foto &&
+            typeof foto.id === "number" &&
+            typeof foto.tamano === "number" &&
+            Number.isFinite(foto.tamano) &&
+            foto.tamano >= 0 &&
+            typeof foto.tipo === "string" &&
+            foto.tipo.startsWith("image/")
+        );
+    });
+
+    if (!fotosValidas) {
+        return false;
+    }
+
+    const tamanoEsperado = 4 + longitud + 
+        datos.fotos.reduce(function (total, foto) {
+            return total + foto.tamano;
+        }, 0);
+    
+    return tamanoEsperado === tamanoArchivo;
+}
+
+async function importarCopia(archivo) {
+    const nuevosIds = [];
+    let reemplazado = false;
+    try {
+        // 1) Leer la cabecera de 4 bytes y el JSON
+        const longitud = new DataView(await archivo.slice(0, 4).arrayBuffer()).getUint32(0);
+        const datos = JSON.parse(await archivo.slice(4, 4 + longitud).text());
+
+        // 2) TU PARTE 1: validar la copia (ver abajo)
+        if (!copiaValida(datos, longitud, archivo.size)) {
+            alert("El archivo no parece una copia válida");
+            return;
+        }
+        // 3) TU PARTE 2: pedir confirmación (ver abajo)
+        const confirmar = confirm(
+            "Vas a reemplazar tu catálogo actual.\n\n" +
+            "Productos en la copia: " + datos.productos.length + "\n" +
+            "Fotos en la copia: " + datos.fotos.length + "\n" +
+            "Productos actuales: " + productos.length + "\n" +
+            "¿Deseas continuar?"
+        );
+
+        if (!confirmar) {
+            return;
+        }
+
+        // 4) Guardar las fotos de la copia y anotar qué número nuevo recibió cada una
+        const equivalencias = {};
+        let inicio = 4 + longitud;
+        for (const foto of datos.fotos) {
+            const blob = archivo.slice(inicio, inicio + foto.tamano, foto.tipo);
+            inicio += foto.tamano;
+            const idNuevo = await guardarFoto(blob);
+            nuevosIds.push(idNuevo);
+            equivalencias[foto.id] = idNuevo;
+        }
+
+        // 5) TU PARTE 3: que cada producto de datos.productos use los números nuevos (ver abajo)
+        datos.productos.forEach(function (p) {
+            if (p.fotos) {
+                p.fotos = p.fotos
+                    .map(function (id) {
+                        return equivalencias[id];
+                    })
+                    .filter(function (id) {
+                        return id !== undefined;
+                    });
+                
+                if (p.fotos.length === 0) {
+                    delete p.fotos;
+                }
+            }
+        });
+
+        // 6) Reemplazar el catálogo
+        const anteriores = productos;
+        productos = datos.productos;
+        guardarProductos();
+        mostrarCatalogo();
+        reemplazado = true;
+
+        // 7) Solo ahora, borrar las fotos del catálogo anterior
+        try {
+            for (const p of anteriores) {
+                for (const id of (p.fotos || [])) {
+                    await borrarFoto(id);
+                }
+            }
+        } catch (error) {
+            console.error("No se pudieron limpiar las fotos anteriores", error);
+        }
+    } catch (error) {
+        if (!reemplazado) {
+            for (const id of nuevosIds) {
+                await borrarFoto(id);
+            }
+        }
+        alert("No se pudo importar la copia");
+        console.error(error);
+    }
+}
+
 document.getElementById("estiloAnuncio").addEventListener("change", actualizarAnuncio);
 document.getElementById("regenerarAnuncio").addEventListener("click", actualizarAnuncio);
 document.getElementById("copiarAnuncio").addEventListener("click", copiarAnuncio);
 
 mostrarCatalogo();
+
+document.getElementById("exportar").addEventListener("click", exportarCopia);
+
+const campoImportar = document.getElementById("importar");
+
+campoImportar.addEventListener("change", function () {
+    const archivo = campoImportar.files[0];
+    if (archivo) {
+        importarCopia(archivo);
+    }
+    campoImportar.value = "";
+});
 
 async function registrarServiceWorker() {
     // TU PARTE: si "serviceWorker" existe en navigator, registra "sw.js" con await,

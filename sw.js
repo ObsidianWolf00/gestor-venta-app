@@ -1,4 +1,4 @@
-const VERSION = "v1";
+const VERSION = "v2";
 const ARCHIVOS = [
     "./",
     "./estilos.css",
@@ -11,7 +11,11 @@ const ARCHIVOS = [
 self.addEventListener("install", function (evento) {
     evento.waitUntil(
         caches.open(VERSION).then(function (cache) {
-            return cache.addAll(ARCHIVOS);
+            return cache.addAll(
+                ARCHIVOS.map(function (url) {
+                    return new Request(url, { cache: "reload"});
+                })
+            );
         })
     );
 });
