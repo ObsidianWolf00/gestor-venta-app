@@ -156,10 +156,19 @@ function editarProducto(id) {
     window.scrollTo(0, 0);
 }
 
-function mostrarAnuncio(producto) {
+async function mostrarAnuncio(producto) {
     productoDelAnuncio = producto;
     actualizarAnuncio();
     document.getElementById("panelAnuncio").hidden = false;
+
+    archivosAnuncio = [];
+    const archivos = await cargarArchivosFotos(producto);
+
+    if (productoDelAnuncio === producto) {
+        archivosAnuncio = archivos;
+    }
+
+    console.log("Fotos preparadas:", archivosAnuncio.length, archivosAnuncio);
 }
 
 document.getElementById("cerrarAnuncio").addEventListener("click", function () {
@@ -611,6 +620,61 @@ async function importarCopia(archivo) {
     }
 }
 
+let archivosAnuncio = [];
+
+async function cargarArchivosFotos(producto) {
+    const archivos = [];
+    // TU PARTE 1: para cada número de producto.fotos (si existe), obtén el Blob con obtenerFoto
+    // y créale un File: new File([blob], "foto-" + n + ".jpg", { type: blob.type})
+    // donde n es 1, 2, 3... según el orden. Ignora las fotos que no existan
+    let n = 1;
+
+    for (const id of producto.fotos || []) {
+        const blob = await obtenerFoto(id);
+        if (!blob) {
+            continue;
+        }
+        const archivo = new File(
+            [blob],
+            "foto-" + n + ".jpg",
+            { type: blob.type}
+        );
+        archivos.push(archivo);
+        n++;
+    }
+
+    return archivos;
+}
+
+async function compartirAnuncio() {
+    const texto = document.getElementById("textoAnuncio").value;
+    try {
+        await navigator.clipboard.writeText(texto);
+    } catch (error) {
+        console.error(error);
+    }
+
+    const datos = { text: texto };
+    if (archivosAnuncio.length > 0 && navigator.canShare && navigator.canShare({ files: archivosAnuncio})) {
+        datos.files = archivosAnuncio;
+    }
+
+    try {
+        await navigator.share(datos);
+    } catch (error) {
+        if (error.name !== "AbortError") {
+            // TU PARTE 2: avisar al usuario de que no se pudo compartir
+            alert("No se pudo compartir el anuncio. Puedes utilizar el texto copiado en el portapapeles.");
+            console.error(error);
+        }
+    }
+}
+
+if (!navigator.share) {
+    document.getElementById("compartirAnuncio").hidden = true;
+}
+
+document.getElementById("compartirAnuncio").addEventListener("click", compartirAnuncio);
 document.getElementById("estiloAnuncio").addEventListener("change", actualizarAnuncio);
 document.getElementById("regenerarAnuncio").addEventListener("click", actualizarAnuncio);
 document.getElementById("copiarAnuncio").addEventListener("click", copiarAnuncio);
