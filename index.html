@@ -16,6 +16,28 @@
             <label>Importar copia <input type="file" id="importar"></label>
             <p>La copia incluye productos y fotos.</p>
         </section>
+        <section id="gestionGrupos">
+            <h2>Mis grupos de gestores</h2>
+            <form id="formularioGrupo">
+                <label>Nombre del grupo
+                    <input id="nombreGrupo" required>
+                </label>
+                <label>
+                    <input type="checkbox" id="permiteAumento">
+                    Permite aumentar el precio
+                </label>
+                <label>
+                    <input type="checkbox" id="grupoActivo" checked>
+                    Grupo activo
+                </label>
+                <label>Notas (opcional)
+                    <textarea id="notasGrupo" rows="2"></textarea>
+                </label>
+                <button type="submit" id="botonGuardarGrupo">Guardar Grupo</button>
+                <button type="button" id="botonCancelarGrupo" hidden>Cancelar</button>
+            </form>
+            <div id="listaGrupos"></div>
+        </section>
         <h2>Añadir producto</h2>
         <form id="formulario">
             <label>Nombre <input id="nombre" required></label>
@@ -28,6 +50,11 @@
                 <select id="monedaPrecio"><option>USD</option><option>CUP</option></select>
             </label>
             <label>Disponibilidad <input id="disponibilidad"></label>
+            <label>Grupo de gestores
+                <select id="grupoProducto">
+                    <option value="">Sin grupo</option>
+                </select>
+            </label>
             <label>Comisión <input id="comision" type="number" min="0" step="any" required></label>
             <label>Moneda de la comisión
                 <select id="monedaComision"><option>CUP</option><option>USD</option></select>

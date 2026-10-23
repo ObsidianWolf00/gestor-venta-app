@@ -16,8 +16,239 @@ function guardarProductos() {
     localStorage.setItem(CLAVE, JSON.stringify(productos));
 }
 
+const CLAVE_GRUPOS = "grupos";
+
+function cargarGrupos() {
+    const texto = localStorage.getItem(CLAVE_GRUPOS);
+    if (texto === null) {
+        return [];
+    }
+    return JSON.parse(texto);
+}
+
+function guardarGrupos() {
+    localStorage.setItem(CLAVE_GRUPOS, JSON.stringify(grupos));
+}
+
+let grupos = cargarGrupos();
 let productos = cargarProductos();
 let idEditando = null;
+let idGrupoEditando = null;
+
+function mostrarGrupos() {
+    const lista = document.getElementById("listaGrupos");
+    lista.replaceChildren();
+
+    if (grupos.length === 0) {
+        const mensaje = document.createElement("p");
+        mensaje.textContent = "Todavía no tienes grupos registrados.";
+        lista.appendChild(mensaje);
+        return;
+    }
+
+    grupos.forEach(function (grupo) {
+        const tarjeta = document.createElement("div");
+        tarjeta.className = "grupo";
+
+        const nombre = document.createElement("h3");
+        nombre.textContent = grupo.nombre;
+        tarjeta.appendChild(nombre);
+
+        const estado = document.createElement("p");
+        estado.textContent = grupo.activo === false ? "Inactivo" : "Activo";
+        tarjeta.appendChild(estado);
+
+        const cantidad = productos.filter(function (producto) {
+            return producto.grupoId === grupo.id;
+        }).length;
+
+        const contador = document.createElement("p");
+        contador.textContent = "Productos asociados: " + cantidad;
+        tarjeta.appendChild(contador);
+
+        if (grupo.permiteAumento) {
+            const aumento = document.createElement("p");
+            aumento.textContent = "Permite aumentar el precio";
+            tarjeta.appendChild(aumento);
+        }
+
+        if (grupo.notas) {
+            const notas = document.createElement("p");
+            notas.textContent = "Notas: " + grupo.notas;
+            tarjeta.appendChild(notas);
+        }
+
+        const botonEditar = document.createElement("button");
+        botonEditar.type = "button";
+        botonEditar.textContent = "Editar";
+        botonEditar.addEventListener("click", function () {
+            editarGrupo(grupo.id);
+        });
+        tarjeta.appendChild(botonEditar);
+
+        const botonEliminar = document.createElement("button");
+        botonEliminar.type = "button";
+        botonEliminar.textContent = "Eliminar";
+        botonEliminar.addEventListener("click", function () {
+            eliminarGrupo(grupo.id);
+        });
+        tarjeta.appendChild(botonEliminar);
+
+        lista.appendChild(tarjeta);
+    });
+}
+
+function cargarSelectorGrupos(idGrupoSeleccionado = null) {
+    const selector = document.getElementById("grupoProducto");
+    selector.replaceChildren();
+
+    const opcionSinGrupo = document.createElement("option");
+    opcionSinGrupo.value = "";
+    opcionSinGrupo.textContent = "Sin grupo";
+    selector.appendChild(opcionSinGrupo);
+
+    grupos.forEach(function (grupo) {
+        if (grupo.activo === false && grupo.id !== idGrupoSeleccionado) {
+            return;
+        }
+
+        const opcion = document.createElement("option");
+        opcion.value = grupo.id;
+        opcion.textContent = grupo.nombre;
+        selector.appendChild(opcion);
+    });
+
+    selector.value = idGrupoSeleccionado !== null
+        ? String(idGrupoSeleccionado)
+        : "";
+}
+
+function editarGrupo(id){
+    const grupo = grupos.find(function (g) {
+        return g.id === id;
+    });
+
+    if (!grupo) {
+        return;
+    }
+
+    idGrupoEditando = id;
+
+    document.getElementById("nombreGrupo").value = grupo.nombre;
+    document.getElementById("grupoActivo").checked = grupo.activo !== false;
+    document.getElementById("permiteAumento").checked = grupo.permiteAumento;
+    document.getElementById("notasGrupo").value = grupo.notas || "";
+
+    document.getElementById("botonGuardarGrupo").textContent = "Guardar cambios";
+    document.getElementById("botonCancelarGrupo").hidden = false;
+
+    document.getElementById("gestionGrupos").scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+    });
+}
+
+function eliminarGrupo(id) {
+    const grupo = grupos.find(function (g) {
+        return g.id === id;
+    });
+
+    if (!grupo) {
+        return;
+    }
+
+    const cantidad = productos.filter(function (producto) {
+        return producto.grupoId === id;
+    }).length;
+
+    if (cantidad > 0) {
+        alert(
+            "No se puede eliminar este grupo porque tiene " +
+            cantidad +
+            " producto(s) asociado(s)."
+        );
+        return;
+    }
+
+    if (!confirm('¿Eliminar el grupo "' + grupo.nombre + '"?')) {
+        return;
+    }
+
+    grupos = grupos.filter(function (g) {
+        return g.id !== id;
+    });
+
+    guardarGrupos();
+    mostrarGrupos();
+
+    if (idGrupoEditando === id) {
+        idGrupoEditando = null;
+        formularioGrupo.reset();
+        document.getElementById("botonGuardarGrupo").textContent = "Guardar grupo";
+        document.getElementById("botonCancelarGrupo").hidden = true;
+    }
+}
+
+const formularioGrupo = document.getElementById("formularioGrupo");
+
+formularioGrupo.addEventListener("submit", function (evento) {
+    evento.preventDefault();
+
+    const nombre = document.getElementById("nombreGrupo").value.trim();
+    const permiteAumento = document.getElementById("permiteAumento").checked;
+    const notas = document.getElementById("notasGrupo").value.trim();
+    const activo = document.getElementById("grupoActivo").checked; 
+
+    const nombreDuplicado = grupos.some(function (grupo) {
+        return grupo.nombre.toLowerCase() === nombre.toLowerCase()
+            && grupo.id !== idGrupoEditando;
+    });
+
+    if (nombreDuplicado) {
+        alert("Ya existe un grupo con ese nombre.");
+        return;
+    }
+
+    if (idGrupoEditando === null) {
+        grupos.push({
+            id: Date.now(),
+            nombre: nombre,
+            permiteAumento: permiteAumento,
+            notas: notas,
+            activo: activo
+        });
+    } else {
+        grupos = grupos.map(function (grupo) {
+            if (grupo.id !== idGrupoEditando) {
+                return grupo;
+            }
+
+            return {
+                id: grupo.id,
+                nombre: nombre,
+                permiteAumento: permiteAumento,
+                notas: notas,
+                activo: activo
+            };
+        });
+    }
+
+    guardarGrupos();
+    mostrarGrupos();
+
+    idGrupoEditando = null;
+    formularioGrupo.reset();
+    document.getElementById("botonGuardarGrupo").textContent = "Guardar grupo";
+    document.getElementById("botonCancelarGrupo").hidden = true;
+});
+
+document.getElementById("botonCancelarGrupo").addEventListener("click", function () {
+    idGrupoEditando = null;
+    formularioGrupo.reset();
+
+    document.getElementById("botonGuardarGrupo").textContent = "Guardar grupo";
+    document.getElementById("botonCancelarGrupo").hidden = true;
+});
 
 function salirModoEdicion() {
     idEditando = null;
@@ -57,8 +288,22 @@ function crearTarjeta(producto) {
     const precio = document.createElement("p");
     precio.textContent = "Precio: " + producto.precio.monto + " " + producto.precio.moneda;
 
+    const comision = document.createElement("p");
+    comision.textContent = "Comisión: " + producto.comision.monto + " " + producto.comision.moneda;
+
     tarjeta.appendChild(titulo);
     tarjeta.appendChild(precio);
+    tarjeta.appendChild(comision);
+
+    const grupo = grupos.find(function (g) {
+        return g.id === producto.grupoId;
+    });
+
+    if (grupo) {
+        const grupoTexto = document.createElement("p");
+        grupoTexto.textContent = "Grupo: " + grupo.nombre;
+        tarjeta.appendChild(grupoTexto);
+    }
 
     if (producto.marca) {
         const marca = document.createElement("p");
@@ -159,6 +404,8 @@ function editarProducto(id) {
     document.getElementById("caracteristicas").value = (producto.caracteristicas || []).join("\n");
     document.getElementById("disponibilidad").value = producto.disponibilidad || "";
 
+    cargarSelectorGrupos(producto.grupoId ?? null);
+
     document.getElementById("botonGuardar").textContent = "Guardar cambios";
     document.getElementById("botonCancelar").hidden = false;
     window.scrollTo(0, 0);
@@ -198,6 +445,12 @@ formulario.addEventListener("submit", async function (evento) {
             moneda: document.getElementById("monedaComision").value
         }
     };
+
+    const grupoSeleccionado = document.getElementById("grupoProducto").value;
+
+    if (grupoSeleccionado !== "") {
+        producto.grupoId = Number(grupoSeleccionado);
+    }
 
     //TU PARTE: los tres campos opcionales (ver abajo)
     const marca = document.getElementById("marca").value.trim();
@@ -536,7 +789,7 @@ async function exportarCopia() {
     }
 
     // 3) Armar el JSON en bytes y una cabecera de 4 bytes con su longitud
-    const datos = { version: 2, fecha: new Date().toISOString(), productos: productos, fotos: fotos };
+    const datos = { version: 3, fecha: new Date().toISOString(), productos: productos, grupos: grupos, fotos: fotos };
     const json = new TextEncoder().encode(JSON.stringify(datos));
     const longitud = new ArrayBuffer(4);
     new DataView(longitud).setUint32(0, json.length);
@@ -559,11 +812,33 @@ async function exportarCopia() {
 function copiaValida(datos, longitud, tamanoArchivo) {
     if (
         !datos ||
-        datos.version !== 2 ||
+        ![2, 3].includes(datos.version) ||
         !Array.isArray(datos.productos) ||
         !Array.isArray(datos.fotos)
     ) {
         return false;
+    }
+
+    if (datos.version === 3 && !Array.isArray(datos.grupos)) {
+        return false;
+    }
+
+    if (datos.version === 3) {
+        const gruposValidos = datos.grupos.every(function (grupo) {
+            return (
+                grupo &&
+                (typeof grupo.id === "number" || typeof grupo.id === "string") &&
+                typeof grupo.nombre === "string" &&
+                grupo.nombre.trim() !== "" &&
+                typeof grupo.permiteAumento === "boolean" &&
+                typeof grupo.notas === "string" &&
+                typeof grupo.activo === "boolean"
+            );
+        });
+
+        if (!gruposValidos) {
+            return false;
+        }
     }
 
     const productosValidos = datos.productos.every(function (p) {
@@ -609,6 +884,8 @@ function copiaValida(datos, longitud, tamanoArchivo) {
 async function importarCopia(archivo) {
     const nuevosIds = [];
     let reemplazado = false;
+    let productosAnteriores = null;
+    let gruposAnteriores = null;
     try {
         // 1) Leer la cabecera de 4 bytes y el JSON
         const longitud = new DataView(await archivo.slice(0, 4).arrayBuffer()).getUint32(0);
@@ -624,6 +901,8 @@ async function importarCopia(archivo) {
             "Vas a reemplazar tu catálogo actual.\n\n" +
             "Productos en la copia: " + datos.productos.length + "\n" +
             "Fotos en la copia: " + datos.fotos.length + "\n" +
+            "Grupos en la copia: " + (datos.grupos || []).length + "\n" +
+            "Grupos actuales: " + grupos.length + "\n" +
             "Productos actuales: " + productos.length + "\n" +
             "¿Deseas continuar?"
         );
@@ -660,16 +939,40 @@ async function importarCopia(archivo) {
             }
         });
 
+        // Preparar los grupos de la copia
+        const gruposImportados = datos.version === 3
+            ? datos.grupos
+            : [];
+        
+        datos.productos.forEach(function (producto) {
+            if (
+                producto.grupoId !== undefined &&
+                !gruposImportados.some(function (grupo) {
+                    return String(grupo.id) === String(producto.grupoId);
+                })
+            ) {
+                delete producto.grupoId;
+            }
+        });
+
         // 6) Reemplazar el catálogo
-        const anteriores = productos;
+        productosAnteriores = productos;
+        gruposAnteriores = grupos;
+
         productos = datos.productos;
+        grupos = gruposImportados;
+
         guardarProductos();
+        guardarGrupos();
         mostrarCatalogo();
+        mostrarGrupos();
+        cargarSelectorGrupos();
+
         reemplazado = true;
 
         // 7) Solo ahora, borrar las fotos del catálogo anterior
         try {
-            for (const p of anteriores) {
+            for (const p of productosAnteriores) {
                 for (const id of (p.fotos || [])) {
                     await borrarFoto(id);
                 }
@@ -679,10 +982,36 @@ async function importarCopia(archivo) {
         }
     } catch (error) {
         if (!reemplazado) {
+            if (productosAnteriores !== null && gruposAnteriores !== null) {
+                productos = productosAnteriores;
+                grupos = gruposAnteriores;
+
+                try {
+                    guardarProductos();
+                    guardarGrupos();
+                    mostrarCatalogo();
+                    mostrarGrupos();
+                    cargarSelectorGrupos();
+                } catch (errorRestauracion) {
+                    console.error(
+                        "No se pudieron restaurar los datos anteriores",
+                        errorRestauracion
+                    );
+                }
+            } 
+
             for (const id of nuevosIds) {
-                await borrarFoto(id);
+                try {
+                    await borrarFoto(id);
+                } catch (errorBorrado) {
+                    console.error(
+                        "No se pudo eliminar una foto importada",
+                        errorBorrado
+                    );
+                }
             }
         }
+
         alert("No se pudo importar la copia");
         console.error(error);
     }
@@ -702,6 +1031,8 @@ document.getElementById("regenerarAnuncio").addEventListener("click", actualizar
 document.getElementById("copiarAnuncio").addEventListener("click", copiarAnuncio);
 
 mostrarCatalogo();
+mostrarGrupos();
+cargarSelectorGrupos();
 
 document.getElementById("exportar").addEventListener("click", exportarCopia);
 
