@@ -1,3 +1,7 @@
+// ==========================================
+// 1. CONFIGURACIÓN Y ALMACENAMIENTO DE PRODUCTOS
+// ==========================================
+
 const CLAVE = "productos";
 
 function cargarProductos() {
@@ -26,6 +30,10 @@ function salirModoEdicion() {
 }
 
 document.getElementById("botonCancelar").addEventListener("click", salirModoEdicion);
+
+// ==========================================
+// 2. GESTIÓN DE PRODUCTOS Y CATÁLOGO
+// ==========================================
 
 function crearTarjeta(producto) {
     const tarjeta = document.createElement("div");
@@ -167,8 +175,6 @@ async function mostrarAnuncio(producto) {
     if (productoDelAnuncio === producto) {
         archivosAnuncio = archivos;
     }
-
-    console.log("Fotos preparadas:", archivosAnuncio.length, archivosAnuncio);
 }
 
 document.getElementById("cerrarAnuncio").addEventListener("click", function () {
@@ -243,6 +249,10 @@ formulario.addEventListener("submit", async function (evento) {
     console.log(productos);
     salirModoEdicion();
 });
+
+// ==========================================
+// 3. GESTIÓN DE FOTOGRAFÍAS
+// ==========================================
 
 const campoFotos = document.getElementById("fotos");
 const vistaPrevia = document.getElementById("vistaPrevia");
@@ -334,6 +344,10 @@ async function borrarFoto(id) {
         };
     });
 }
+
+// ==========================================
+// 4. GENERACIÓN DE ANUNCIOS
+// ==========================================
 
 function datosPublicos(producto) {
     return {
@@ -439,6 +453,60 @@ async function copiarAnuncio() {
         console.error(error);
     }
 }
+
+let archivosAnuncio = [];
+
+async function cargarArchivosFotos(producto) {
+    const archivos = [];
+    // TU PARTE 1: para cada número de producto.fotos (si existe), obtén el Blob con obtenerFoto
+    // y créale un File: new File([blob], "foto-" + n + ".jpg", { type: blob.type})
+    // donde n es 1, 2, 3... según el orden. Ignora las fotos que no existan
+    let n = 1;
+
+    for (const id of producto.fotos || []) {
+        const blob = await obtenerFoto(id);
+        if (!blob) {
+            continue;
+        }
+        const archivo = new File(
+            [blob],
+            "foto-" + n + ".jpg",
+            { type: blob.type}
+        );
+        archivos.push(archivo);
+        n++;
+    }
+
+    return archivos;
+}
+
+async function compartirAnuncio() {
+    const texto = document.getElementById("textoAnuncio").value;
+    try {
+        await navigator.clipboard.writeText(texto);
+    } catch (error) {
+        console.error(error);
+    }
+
+    const datos = { text: texto };
+    if (archivosAnuncio.length > 0 && navigator.canShare && navigator.canShare({ files: archivosAnuncio})) {
+        datos.files = archivosAnuncio;
+    }
+
+    try {
+        await navigator.share(datos);
+    } catch (error) {
+        if (error.name !== "AbortError") {
+            // TU PARTE 2: avisar al usuario de que no se pudo compartir
+            alert("No se pudo compartir el anuncio. Puedes utilizar el texto copiado en el portapapeles.");
+            console.error(error);
+        }
+    }
+}
+
+// ==========================================
+// 5. COPIAS DE SEGURIDAD: EXPORTAR E IMPORTAR
+// ==========================================
 
 async function exportarCopia() {
     // 1) Reunir los números de foto que usan los productos, sin repetir
@@ -620,55 +688,9 @@ async function importarCopia(archivo) {
     }
 }
 
-let archivosAnuncio = [];
-
-async function cargarArchivosFotos(producto) {
-    const archivos = [];
-    // TU PARTE 1: para cada número de producto.fotos (si existe), obtén el Blob con obtenerFoto
-    // y créale un File: new File([blob], "foto-" + n + ".jpg", { type: blob.type})
-    // donde n es 1, 2, 3... según el orden. Ignora las fotos que no existan
-    let n = 1;
-
-    for (const id of producto.fotos || []) {
-        const blob = await obtenerFoto(id);
-        if (!blob) {
-            continue;
-        }
-        const archivo = new File(
-            [blob],
-            "foto-" + n + ".jpg",
-            { type: blob.type}
-        );
-        archivos.push(archivo);
-        n++;
-    }
-
-    return archivos;
-}
-
-async function compartirAnuncio() {
-    const texto = document.getElementById("textoAnuncio").value;
-    try {
-        await navigator.clipboard.writeText(texto);
-    } catch (error) {
-        console.error(error);
-    }
-
-    const datos = { text: texto };
-    if (archivosAnuncio.length > 0 && navigator.canShare && navigator.canShare({ files: archivosAnuncio})) {
-        datos.files = archivosAnuncio;
-    }
-
-    try {
-        await navigator.share(datos);
-    } catch (error) {
-        if (error.name !== "AbortError") {
-            // TU PARTE 2: avisar al usuario de que no se pudo compartir
-            alert("No se pudo compartir el anuncio. Puedes utilizar el texto copiado en el portapapeles.");
-            console.error(error);
-        }
-    }
-}
+// ==========================================
+// 6. INICIALIZACIÓN Y EVENTOS DE LA APLICACIÓN
+// ==========================================
 
 if (!navigator.share) {
     document.getElementById("compartirAnuncio").hidden = true;
