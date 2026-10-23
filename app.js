@@ -180,6 +180,7 @@ function eliminarGrupo(id) {
 
     guardarGrupos();
     mostrarGrupos();
+    cargarSelectorGrupos();
 
     if (idGrupoEditando === id) {
         idGrupoEditando = null;
@@ -235,6 +236,7 @@ formularioGrupo.addEventListener("submit", function (evento) {
 
     guardarGrupos();
     mostrarGrupos();
+    cargarSelectorGrupos();
 
     idGrupoEditando = null;
     formularioGrupo.reset();
@@ -499,6 +501,7 @@ formulario.addEventListener("submit", async function (evento) {
 
     mostrarCatalogo();
     guardarProductos();
+    mostrarGrupos();
     console.log(productos);
     salirModoEdicion();
 });
