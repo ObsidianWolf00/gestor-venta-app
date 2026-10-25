@@ -100,6 +100,15 @@ function mostrarGrupos() {
 
 function cargarSelectorGrupos(idGrupoSeleccionado = null) {
     const selector = document.getElementById("grupoProducto");
+    const conservarSeleccionActual = arguments.length === 0;
+    const SeleccionAnterior = selector.value;
+
+    const idObjetivo = conservarSeleccionActual
+        ? SeleccionAnterior
+        : idGrupoSeleccionado !== null
+            ? String(idGrupoSeleccionado)
+            : "";
+
     selector.replaceChildren();
 
     const opcionSinGrupo = document.createElement("option");
@@ -108,18 +117,22 @@ function cargarSelectorGrupos(idGrupoSeleccionado = null) {
     selector.appendChild(opcionSinGrupo);
 
     grupos.forEach(function (grupo) {
-        if (grupo.activo === false && grupo.id !== idGrupoSeleccionado) {
+        if (grupo.activo === false && String(grupo.id) !== idObjetivo) {
             return;
         }
 
         const opcion = document.createElement("option");
-        opcion.value = grupo.id;
+        opcion.value = String(grupo.id);
         opcion.textContent = grupo.nombre;
         selector.appendChild(opcion);
     });
 
-    selector.value = idGrupoSeleccionado !== null
-        ? String(idGrupoSeleccionado)
+    const grupoExiste = grupos.some(function (grupo) {
+        return String(grupo.id) === idObjetivo;
+    });
+
+    selector.value = idObjetivo !== "" && grupoExiste
+        ? idObjetivo
         : "";
 }
 
@@ -237,6 +250,7 @@ formularioGrupo.addEventListener("submit", function (evento) {
     guardarGrupos();
     mostrarGrupos();
     cargarSelectorGrupos();
+    mostrarCatalogo();
 
     idGrupoEditando = null;
     formularioGrupo.reset();
@@ -255,6 +269,7 @@ document.getElementById("botonCancelarGrupo").addEventListener("click", function
 function salirModoEdicion() {
     idEditando = null;
     formulario.reset();
+    cargarSelectorGrupos();
     vistaPrevia.replaceChildren();
     fotosNuevas = [];
     
@@ -389,6 +404,7 @@ async function eliminarProducto(id) {
 
     guardarProductos();
     mostrarCatalogo();
+    mostrarGrupos();
 }
 
 function editarProducto(id) {
@@ -448,13 +464,23 @@ formulario.addEventListener("submit", async function (evento) {
         }
     };
 
+    if (
+        !Number.isFinite(producto.precio.monto) ||
+        producto.precio.monto < 0 ||
+        !Number.isFinite(producto.comision.monto) ||
+        producto.comision.monto < 0
+    ) {
+        alert("El precio y la comisión deben ser números válidos mayores o iguales a cero.");
+        return;
+    }
+
     const grupoSeleccionado = document.getElementById("grupoProducto").value;
 
     if (grupoSeleccionado !== "") {
         producto.grupoId = Number(grupoSeleccionado);
     }
 
-    //TU PARTE: los tres campos opcionales (ver abajo)
+    // Campos opcionales
     const marca = document.getElementById("marca").value.trim();
     if (marca !== "") {
         producto.marca = marca;
@@ -620,7 +646,7 @@ function generarAnuncioSimple(d) {
     if (d.marca) {
         lineas.push(d.marca);
     }
-    // TU PARTE: las características (cada una en su línea), el precio y la disponibilidad
+
     if (d.caracteristicas) {
         lineas.push(...d.caracteristicas);
     }
@@ -695,13 +721,11 @@ async function copiarAnuncio() {
     const boton = document.getElementById("copiarAnuncio");
     try {
         await navigator.clipboard.writeText(texto);
-        //TU PARTE 1: avisar que se copio
         boton.textContent = "¡Copiado!";
         setTimeout(function () {
             boton.textContent = "Copiar texto";
         }, 1500);
     } catch (error) {
-        //TU PARTE 2: avisar que no se pudo copiar
         boton.textContent = "No se pudo copiar";
         setTimeout(function () {
             boton.textContent = "Copiar texto";
@@ -714,9 +738,6 @@ let archivosAnuncio = [];
 
 async function cargarArchivosFotos(producto) {
     const archivos = [];
-    // TU PARTE 1: para cada número de producto.fotos (si existe), obtén el Blob con obtenerFoto
-    // y créale un File: new File([blob], "foto-" + n + ".jpg", { type: blob.type})
-    // donde n es 1, 2, 3... según el orden. Ignora las fotos que no existan
     let n = 1;
 
     for (const id of producto.fotos || []) {
@@ -753,7 +774,6 @@ async function compartirAnuncio() {
         await navigator.share(datos);
     } catch (error) {
         if (error.name !== "AbortError") {
-            // TU PARTE 2: avisar al usuario de que no se pudo compartir
             alert("No se pudo compartir el anuncio. Puedes utilizar el texto copiado en el portapapeles.");
             console.error(error);
         }
@@ -768,8 +788,6 @@ async function exportarCopia() {
     // 1) Reunir los números de foto que usan los productos, sin repetir
     const ids = [];
     productos.forEach(function (p) {
-        // TU PARTE 1: si p tiene fotos, añade a ids cada número que todavía no esté
-        // (pista: ids.includes(n) dice si ya está)
         if (p.fotos) {
             p.fotos.forEach(function (id) {
                 if (!ids.includes(id)) {
@@ -801,7 +819,7 @@ async function exportarCopia() {
     const archivo = new Blob([longitud, json].concat(bloques), { type: "application/octet-stream" });
     console.log(fotos.length + " fotos, " + archivo.size + " bytes");
 
-    // 5) TU PARTE 2: descárgalo con el mismo método de antes, con el nombre
+    // 5) Descargar el archivo
     const enlace = document.createElement("a");
     enlace.href = URL.createObjectURL(archivo);
     enlace.download = "gestor-copia-" + datos.fecha.slice(0, 10) + ".copia";
@@ -830,7 +848,7 @@ function copiaValida(datos, longitud, tamanoArchivo) {
         const gruposValidos = datos.grupos.every(function (grupo) {
             return (
                 grupo &&
-                (typeof grupo.id === "number" || typeof grupo.id === "string") &&
+                Number.isFinite(grupo.id) &&
                 typeof grupo.nombre === "string" &&
                 grupo.nombre.trim() !== "" &&
                 typeof grupo.permiteAumento === "boolean" &&
@@ -842,21 +860,54 @@ function copiaValida(datos, longitud, tamanoArchivo) {
         if (!gruposValidos) {
             return false;
         }
+
+        const idsGrupos = datos.grupos.map(function (grupo) {
+            return grupo.id;
+        });
+
+        if (new Set(idsGrupos).size !== idsGrupos.length) {
+            return false;
+        }
     }
 
     const productosValidos = datos.productos.every(function (p) {
         return (
             p &&
-            p.id !== undefined &&
+            typeof p.id === "number" &&
             typeof p.nombre === "string" &&
             p.precio &&
-            typeof p.precio.monto === "number" &&
+            Number.isFinite(p.precio.monto) &&
+            p.precio.monto >= 0 &&
+            typeof p.precio.moneda === "string" &&
             p.comision &&
-            typeof p.comision.monto === "number"
+            Number.isFinite(p.comision.monto) &&
+            p.comision.monto >= 0 &&
+            typeof p.comision.moneda === "string" &&
+            (p.marca === undefined || typeof p.marca === "string") &&
+            (p.disponibilidad === undefined || typeof p.disponibilidad === "string") &&
+            (p.caracteristicas === undefined ||
+                (Array.isArray(p.caracteristicas) &&
+                    p.caracteristicas.every(function (caracteristica) {
+                        return typeof caracteristica === "string";
+                    }))) &&
+            (p.fotos === undefined ||
+                (Array.isArray(p.fotos) &&
+                    p.fotos.every(function (idFoto) {
+                        return typeof idFoto === "number";
+                    }))) &&
+            (p.grupoId === undefined || Number.isFinite(p.grupoId))
         );
     });
 
     if (!productosValidos) {
+        return false;
+    }
+
+    const idsProductos = datos.productos.map(function (producto) {
+        return producto.id;
+    });
+
+    if (new Set(idsProductos).size !== idsProductos.length) {
         return false;
     }
 
@@ -894,18 +945,20 @@ async function importarCopia(archivo) {
         const longitud = new DataView(await archivo.slice(0, 4).arrayBuffer()).getUint32(0);
         const datos = JSON.parse(await archivo.slice(4, 4 + longitud).text());
 
-        // 2) TU PARTE 1: validar la copia (ver abajo)
+        // 2) Validar la copia
         if (!copiaValida(datos, longitud, archivo.size)) {
             alert("El archivo no parece una copia válida");
             return;
         }
-        // 3) TU PARTE 2: pedir confirmación (ver abajo)
+        // 3) Pedir confirmación
         const confirmar = confirm(
             "Vas a reemplazar tu catálogo actual.\n\n" +
             "Productos en la copia: " + datos.productos.length + "\n" +
             "Fotos en la copia: " + datos.fotos.length + "\n" +
-            "Grupos en la copia: " + (datos.grupos || []).length + "\n" +
-            "Grupos actuales: " + grupos.length + "\n" +
+            (datos.version === 2
+                ? "Los grupos actuales se conservarán: " + grupos.length + "\n"
+                : "Grupos en la copia: " + datos.grupos.length + "\n" +
+                  "Grupos actuales: " + grupos.length + "\n") +
             "Productos actuales: " + productos.length + "\n" +
             "¿Deseas continuar?"
         );
@@ -925,7 +978,7 @@ async function importarCopia(archivo) {
             equivalencias[foto.id] = idNuevo;
         }
 
-        // 5) TU PARTE 3: que cada producto de datos.productos use los números nuevos (ver abajo)
+        // 5) Que cada producto de datos.productos use los números nuevos
         datos.productos.forEach(function (p) {
             if (p.fotos) {
                 p.fotos = p.fotos
@@ -945,7 +998,7 @@ async function importarCopia(archivo) {
         // Preparar los grupos de la copia
         const gruposImportados = datos.version === 3
             ? datos.grupos
-            : [];
+            : grupos;
         
         datos.productos.forEach(function (producto) {
             if (
@@ -1050,8 +1103,6 @@ campoImportar.addEventListener("change", function () {
 });
 
 async function registrarServiceWorker() {
-    // TU PARTE: si "serviceWorker" existe en navigator, registra "sw.js" con await,
-    // dentro de un try/catch que muestre el error en la consola si falla
     if ("serviceWorker" in navigator) {
         try {
             await navigator.serviceWorker.register("sw.js");
